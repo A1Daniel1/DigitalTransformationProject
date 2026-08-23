@@ -1,74 +1,580 @@
 \documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
 \usepackage{graphicx}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{xurl}
+\usepackage[
+  colorlinks=true,
+  linkcolor=blue,
+  urlcolor=blue,
+  citecolor=blue,
+  bookmarks=true,
+  bookmarksopen=true,
+  pdftitle={Early Detection of Illegal Territorial Activities via Satellite Imagery},
+  pdfauthor={Vélez Muñoz, Gonzalez Veloza, Ahumada León}
+]{hyperref}
+\usepackage{geometry}
+\geometry{margin=1in}
 
-\title{TDSE Project}
-
+% ----------------------------------------------------------------
+\title{%
+  Early Detection of Illegal Territorial Activities\\
+  via Satellite Imagery: A Cloud-Based\\
+  Multi-Phenomenon Monitoring Architecture
+}
 \author{
-  Juan Pablo Vélez Muñoz
-  \and
-  Luiza Mariana Gonzalez Veloza
-  \and
+  Juan Pablo Vélez Muñoz \\
+  Luiza Mariana Gonzalez Veloza \\
   Daniel Alexander Ahumada León
 }
-
 \date{August 2026}
+% ----------------------------------------------------------------
 
 \begin{document}
 
-\maketitle
+\begin{titlepage}
+    \centering
+    \vspace*{2cm}
+    {\Large \textbf{Early Detection of Illegal Territorial Activities\\
+    via Satellite Imagery: A Cloud-Based\\
+    Multi-Phenomenon Monitoring Architecture}\par}
+    \vspace{1.5cm}
+    {\Large Enterprise Architecture and Digital Transformation \par}
+    \vspace{2cm}
+    {\large
+    Juan Pablo Vélez Muñoz \\
+    Luiza Mariana Gonzalez Veloza \\
+    Daniel Alexander Ahumada León
+    \par}
+    \vfill
+    {\large August 2026 \par}
+\end{titlepage}
 
-% --- INTRODUCTION ---
+\tableofcontents
+\newpage
+
+% =============================================================
+% ABSTRACT
+% =============================================================
+\begin{abstract}
+In Colombia, deforestation, illegal gold mining, and coca cultivation are monitored
+through separate institutional pipelines that operate on quarterly or annual cycles,
+creating a gap of months to a year between when territorial changes occur and when
+authorities can respond.
+Satellite imagery provides the raw data necessary to close this gap, but no existing
+system jointly detects these three phenomena with sufficient accuracy and operational
+frequency to support near-real-time institutional response.
+The closest precedent, Riocampo et al.\ (2023) achieved only 60-70\% detection
+rates using optical imagery alone, without addressing false-alarm management or
+cloud-cover robustness.
+This project proposes a cloud-based, scalable monitoring architecture that ingests
+multi-source satellite data (optical and SAR radar), applies a multi-label
+classification pipeline to jointly detect the three phenomena, and exposes alerts
+through a structured API consumed by institutional stakeholders.
+The architecture is designed for deployment at national scale, with components
+spanning automated satellite ingestion, preprocessing, multi-source feature fusion,
+joint classification, false-alarm filtering, and alert delivery to existing
+government information systems.
+As a proof of concept, the proposal includes a scoped pilot that would evaluate
+the central design decision of the architecture: whether a joint multi-label
+classifier outperforms three independent detectors on a region with documented
+overlap of the three phenomena, using precision, recall, and false alarm rate as
+primary metrics.
+The expected contribution is a reproducible reference architecture for
+large-scale illegal activity monitoring and an evidence-based answer to that
+design question.
+\end{abstract}
+
+\newpage
+
+% =============================================================
+% INTRODUCTION
+% =============================================================
 \section{Introduction}
 
-Keeping track of environmental and social issues in remote areas is hard because reaching these places is difficult. Satellite images help us observe large areas of land over time, but checking all these images manually takes too much time and effort.
-
-In this project, we look at how to use automated tools to analyze satellite images. The goal is to spot interesting patterns and highlight areas that might need a closer look, helping teams focus on where it matters most.
-
-Here is how we organized this paper: we explain the main problem, review what others have built, present our proposed system, and show our plan for the prototype and testing.
-
-
 \subsection{Context}
-Monitoring large territories takes a lot of time and resources. While satellite images give us a way to look at changes from above, handling thousands of images manually creates a bottleneck. We need a simpler, faster way to process this data.
 
-\subsection{Problem / Niche}
-Environmental and social activities can quickly change large areas of land, especially in remote places where sending people to check on-site is hard and expensive. Satellite images cover a lot of ground, but there are so many of them that checking everything manually is almost impossible.
+Monitoring large remote territories requires substantial institutional resources
+that Colombia's environmental and judicial agencies do not consistently have
+available.
+Deforestation, illegal gold mining (EVOA), and coca cultivation are currently
+tracked through separate pipelines: IDEAM's SMBYC publishes deforestation alerts
+quarterly; UNODC and SIMCI release coca cultivation figures annually; and EVOA
+reporting operates on a similarly long cycle.
+Indigenous communities and \textit{resguardos} in affected regions often the
+first to perceive on-the-ground changes and national bodies such as IDEAM, the
+Ministry of Environment, and the security forces may not receive official alerts
+until several months or up to a year after the damage occurs~\cite{mongabay_siona2023}.
 
-Our focus is on using automated tools to scan satellite images and highlight areas where important changes are happening. The main challenge is making sure the system gives useful alerts without generating too many false alarms, and without assuming every change on the map means something illegal is going on.
+Critically, these three phenomena do not occur in isolation.
+Data from IDEAM and UNODC show that they frequently overlap in the same geographic
+areas and during the same periods, suggesting a structural co-occurrence that the
+current siloed monitoring approach fails to exploit.
+
+\subsection{Problem}
+
+Satellite imagery is already freely and continuously available, so the core
+bottleneck is not data access but the capacity to process that data at operational
+frequency and at the required spatial precision.
+The persistent monitoring gap between the moment a territorial change occurs and
+the moment an authority can act on it creates a window in which evidence
+disappears, perpetrators relocate, and ecological damage compounds.
+
+This raises a concrete technical question: \textit{is it better to continue
+monitoring each phenomenon separately, given their distinct spectral and
+structural signatures in satellite imagery, or is it feasible and advantageous to
+detect them jointly, leveraging their geographic co-occurrence?}
+Any viable answer must also manage false alarm rates carefully, because
+institutional trust in an automated alert system depends on its specificity,
+not only its sensitivity.
+
 \subsection{Contributions}
-% What we are building and bringing to the table
+
+This work makes the following contributions at this stage of the project:
+
+\begin{itemize}
+    \item Using official data from IDEAM and UNODC, we provide quantitative and
+    qualitative evidence that deforestation, illegal mining, and coca cultivation
+    co-occur systematically across Colombian territory and are accelerating.
+    \item We conduct a critical comparative review of existing satellite monitoring
+    systems: SMBYC, Global Forest Watch / GLAD, CoMiMo, and Riocampo et al.\
+    (2023) and demonstrate that none of them simultaneously addresses
+    multi-phenomenon joint detection, cloud-cover robustness, and false-alarm
+    management at operational scale.
+    \item We propose a large-scale cloud-based monitoring architecture whose
+    principal components include an automated satellite ingestion pipeline,
+    multi-source feature fusion (optical + SAR), a joint multi-label
+    classification layer, a false-alarm filtering stage, and a structured
+    alert delivery API consumable by existing government platforms.
+    \item We define a scoped proof-of-concept pilot and explicit go/no-go
+    criteria to evaluate the central architectural design decision joint
+    versus independent detection before committing resources to full
+    deployment.
+\end{itemize}
 
 \subsection{Document Structure}
-% How the paper is organized
+
+The remainder of this document is organized as follows.
+Section~\ref{sec:problem} characterizes the problem with qualitative and
+quantitative evidence.
+Section~\ref{sec:sota} reviews existing systems and their limitations.
+Section~\ref{sec:gap} identifies the residual gap and presents our proposed
+solution and architecture direction.
+Section~\ref{sec:architecture} describes the proposed system architecture.
+Section~\ref{sec:prototype} presents the prototype implementation.
+Section~\ref{sec:results} reports the results obtained.
+Finally, Section~\ref{sec:conclusions} summarizes conclusions and outlines
+future work.
 
 
-% --- BODY OF THE PAPER ---
+% =============================================================
+% PROBLEM
+% =============================================================
 \section{Problem}
+\label{sec:problem}
+
 \subsection{Qualitative Aspects}
+
+Indigenous communities in the Colombian Amazon are typically the first to perceive
+the effects of deforestation and illicit crops, often before any official alert
+is issued.
+Young members of the Siona people, for example, have publicly reported the loss
+of fauna and the disruption of their spiritual relationship with their territory
+due to encroaching deforestation and illegal activity~\cite{mongabay_siona2023}.
+
+State interventions, when they occur, do not consistently produce lasting results.
+Conservation specialists have documented that a law enforcement operation against
+illegal mining in Parque Nacional Río Puré had measurable effects for only
+approximately two months, after which activity resumed due to the absence of
+sustained institutional presence in remote areas~\cite{mongabay_riopure2026}.
+This pattern illustrates a systemic challenge: without continuous, automated
+monitoring, illegal activity relocates rather than disappears, and each response
+cycle begins from scratch.
+
 \subsection{Quantitative Aspects}
 
+Official figures show accelerating trends across all three phenomena, summarized
+in Table~\ref{tab:quant}.
+
+\begin{table}[ht]
+\centering
+\caption{Trends in deforestation, coca cultivation, and illegal gold mining in Colombia}
+\label{tab:quant}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llrrl}
+\toprule
+\textbf{Phenomenon} & \textbf{Year} & \textbf{Area (ha)} & \textbf{Change} & \textbf{Source} \\
+\midrule
+\multirow{3}{*}{Deforestation}
+ & 2023 & 79{,}256  & ---    & IDEAM / SMByC~\cite{ideam_smbyc} \\
+ & 2024 & 113{,}608 & +43\%  & IDEAM / SMByC \\
+ & 2025 & 119{,}483 & +5.2\% & El Tiempo~\cite{eltiempo_deforestacion2025} \\
+\midrule
+\multirow{3}{*}{Coca cultivation}
+ & 2021 & 204{,}000 & ---    & UNODC / SIMCI \\
+ & 2022 & 230{,}000 & +13\%  & UNODC / SIMCI \\
+ & 2023 & 253{,}000 & +10\%  & UNODC / SIMCI~\cite{minjusticia_coca2023} \\
+\midrule
+\multirow{2}{*}{Illegal gold mining (EVOA)}
+ & 2021 & 57{,}984 & ---   & UNODC \\
+ & 2022 & 63{,}123 & +8\%  & UNODC~\cite{infobae_evoa2023} \\
+\bottomrule
+\end{tabular}%
+}
+\vspace{2mm}
+\begin{flushleft}
+\footnotesize
+\textit{Note:} In 2023, deforestation reached its lowest level in 23 years before
+rising sharply in 2024.
+In 2022, illegal alluvial gold extraction (EVOA) accounted for 73\% of the total
+area affected by this activity~\cite{infobae_evoa2023}.
+\end{flushleft}
+\end{table}
+
+The relationship among these phenomena is not uniform but is structurally
+significant.
+In 2021, UNODC found that 44\% of territories with alluvial gold extraction also
+presented coca cultivation, and that in these overlapping zones illicit activity
+reached 87\%.
+However, the relationship with deforestation is more nuanced: IDEAM estimates
+that only approximately 13\% of deforestation is attributable to illicit crops,
+while cattle ranching expansion and land grabbing are currently among its primary
+drivers.
+This heterogeneity is precisely what makes joint detection both challenging and
+informative: a system that can distinguish causes of land-cover change, rather
+than merely detecting that change occurred, provides substantially more actionable
+intelligence to responding institutions.
+
+
+% =============================================================
+% STATE OF THE ART
+% =============================================================
 \section{State of the Art}
+\label{sec:sota}
+
 \subsection{Grey Literature}
+
+The \textbf{SMByC} (Sistema de Monitoreo de Bosques y Carbono) of IDEAM has
+published quarterly Early Deforestation Alerts (ATD) using MODIS and Landsat
+imagery since 2016~\cite{ideam_smbyc,smbyc_atd_github}.
+The \textbf{UNODC}, through \textbf{SIMCI}, produces annual coca cultivation
+monitoring reports~\cite{minjusticia_coca2023}, and through its \textbf{EVOA}
+reports tracks illegal alluvial gold extraction~\cite{infobae_evoa2023}.
+Investigative journalism outlets such as \textbf{Mongabay Latam} complement these
+institutional sources by documenting community-level effects and the practical
+limitations of state intervention in remote
+regions~\cite{mongabay_siona2023,mongabay_riopure2026}.
+
 \subsection{Scientific Literature}
+
+\textbf{Saavedra-Romero (2017)} developed an early change-detection model for
+forest cover achieving 79\% accuracy, which served as the methodological
+foundation for CoMiMo~\cite{comimo_urosario} a system for detecting illegal
+mining developed at Universidad del Rosario.
+CoMiMo demonstrated the feasibility of near-real-time satellite-based detection
+for a single phenomenon, but its scope is restricted to mining and it has not
+been extended to the multi-phenomenon case.
+
+The most directly related work is \textbf{Riocampo et al.\ (2023)}~\cite{riocampo2023},
+who attempted to jointly detect illegal mining, deforestation, and illicit crops
+from satellite imagery using convolutional neural networks applied to optical
+imagery.
+Their system achieved a detection rate of 60-70\%, which falls below the
+operational threshold that would be needed for institutional deployment.
+Critically, the study does not report precision, false positive rates, or
+any mechanism for managing false alarms an omission that is especially
+significant given that false alerts erode institutional trust in automated
+systems and can trigger costly on-the-ground verifications.
+Additionally, Riocampo et al.\ relied exclusively on optical imagery, which is
+vulnerable to cloud cover: in Colombia's tropical regions, cloud obstruction
+can persist for weeks at a time, creating blind spots precisely during
+periods of active environmental change.
+Their work also does not address the question of scalability or operational
+deployment, making it a proof-of-concept that does not translate directly
+to an actionable monitoring platform.
+
+The \textbf{FACSAT-1} program of the Colombian Air Force demonstrated the use
+of neural networks for open-pit mining pattern detection~\cite{facsat1}, but
+this work targets a narrow sub-problem and does not generalize to the
+multi-phenomenon, multi-source architecture that an operational system
+would require.
+
 \subsection{Technical Documentation}
 
-\section{Motivation / GAP / Solution}
+The SMByC's ATD pipeline~\cite{smbyc_atd_github} uses MODIS for high-frequency,
+low-resolution coverage and Landsat for high-resolution but less frequent updates.
+This dual-sensor design illustrates the classic trade-off between temporal
+resolution and spatial resolution in satellite monitoring, and it motivates the
+addition of SAR (Synthetic Aperture Radar) imagery which is available at
+competitive temporal resolution and is not affected by cloud cover as a third
+data source in our proposed architecture.
 
+\subsection{Comparative Summary}
+
+Table~\ref{tab:sota} summarizes the capabilities and limitations of the most
+relevant existing systems.
+
+\begin{table}[ht]
+\centering
+\caption{Comparison of existing satellite monitoring systems}
+\label{tab:sota}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lccccl}
+\toprule
+\textbf{System} & \textbf{Deforestation} & \textbf{Mining} & \textbf{Coca} & \textbf{SAR} & \textbf{Key Limitation} \\
+\midrule
+SMByC / ATD         & \checkmark & --         & --         & -- & Quarterly cadence; no cause attribution \\
+GLAD (GFW)          & \checkmark & --         & --         & -- & Optical only; no cause attribution \\
+CoMiMo              & --         & \checkmark & --         & -- & Single phenomenon; not publicly deployed \\
+FACSAT-1            & --         & \checkmark & --         & -- & Narrow scope; no multi-label output \\
+Riocampo et al.\ (2023) & \checkmark & \checkmark & \checkmark & -- & 60--70\% recall; no false-alarm management; optical only \\
+\textbf{This work}  & \checkmark & \checkmark & \checkmark & \checkmark & Pilot scope; to be validated \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+
+% =============================================================
+% MOTIVATION / GAP / SOLUTION
+% =============================================================
+\section{Motivation, Gap, and Proposed Solution}
+\label{sec:gap}
+
+\subsection{Identified Gap}
+
+The comparative review in Section~\ref{sec:sota} reveals a gap with two
+interlocking dimensions.
+The first is \textit{coverage}: no currently operational system jointly detects
+all three phenomena deforestation, illegal mining, and coca cultivation with
+sufficient accuracy for institutional use.
+The second is \textit{operationalizability}: even the only prior work that
+attempted joint detection (Riocampo et al., 2023) is a standalone
+proof-of-concept that does not address cloud-cover robustness, false-alarm
+management, alert delivery, or deployment at scale.
+
+\subsection{Proposed Solution}
+
+We propose a \textbf{cloud-based, multi-source satellite monitoring architecture}
+designed to continuously ingest satellite data, jointly classify territorial
+changes by phenomenon type, filter false alarms, and deliver structured alerts
+to institutional consumers via an API.
+
+The principal design decisions that distinguish this proposal from prior work are:
+
+\begin{enumerate}
+    \item \textbf{Multi-source fusion:} The architecture would ingest both
+    optical imagery (Sentinel-2, Landsat) and SAR imagery (Sentinel-1) to
+    maintain observability during cloud-cover periods the primary technical
+    differentiator from Riocampo et al.\ (2023) and all operational systems
+    currently reviewed.
+    \item \textbf{Multi-label classification:} Rather than operating three
+    independent binary classifiers in isolation, the proposed system would
+    evaluate whether a shared multi-label model trained on the joint
+    distribution of the three phenomena achieves better calibration and lower
+    false alarm rates, particularly in zones of co-occurrence. This is the
+    central architectural hypothesis to be validated by the pilot.
+    \item \textbf{Explicit false-alarm management:} A post-classification
+    filtering stage would apply temporal consistency checks and spatial
+    context analysis to suppress spurious alerts, with a tunable
+    precision-recall trade-off exposed to institutional operators through
+    configurable thresholds.
+    \item \textbf{Structured alert delivery API:} Rather than producing image
+    outputs requiring manual inspection, the system would expose a REST API
+    delivering structured, georeferenced alerts consumable by existing
+    institutional platforms such as SMBYC dashboards and government data
+    portals.
+    \item \textbf{Cloud-native scalability:} The architecture would be built
+    on cloud-native principles containerized microservices, managed object
+    storage for satellite data, auto-scaling inference endpoints so that
+    geographic coverage could be expanded from a pilot region to the national
+    territory without proportional increases in operational cost or manual
+    intervention.
+\end{enumerate}
+
+\subsection{Proof-of-Concept Pilot and Decision Criteria}
+
+The full architecture is intended for large-scale deployment with the
+institutional and computational resources of an agency such as IDEAM or a
+national environmental technology fund.
+As a first validation step, the proposal includes a proof-of-concept pilot
+focused on the single most technically uncertain component: the question of
+whether joint multi-label classification outperforms three independent
+binary classifiers on multi-source satellite data.
+
+Such a pilot would be structured as follows:
+\begin{itemize}
+    \item \textbf{Study area:} A geographic region in Colombia with
+    documented, spatially verified overlap of the three phenomena during
+    a known time window, such as parts of Caquetá or Putumayo where
+    IDEAM and UNODC data confirm co-occurrence.
+    \item \textbf{Data:} Labeled time-series combining Sentinel-1 (SAR)
+    and Sentinel-2 (optical) imagery, using official IDEAM and UNODC
+    ground-truth records as labels.
+    \item \textbf{Experimental comparison:} Two model configurations trained
+    on identical data splits (a) three independent binary classifiers and
+    (b) a single shared multi-label classifier evaluated under the same
+    conditions.
+    \item \textbf{Metrics:} Precision, recall, F1 score, and false positive
+    rate reported per phenomenon and aggregated across the label space.
+\end{itemize}
+
+The joint approach would be considered architecturally preferable and
+worth scaling within the full platform if it achieves: (a) recall
+$\geq 0.75$ on at least two of the three phenomena, (b) precision
+$\geq 0.70$ on all three, and (c) false positive rate $\leq 0.20$
+across the combined label space.
+If these thresholds are not met, the architecture would either be revised
+to use independent detectors per phenomenon, or the fusion strategy would
+be reconsidered, before committing further resources to full-scale
+deployment.
+
+
+% =============================================================
+% ARCHITECTURE
+% =============================================================
 \section{Architecture}
+\label{sec:architecture}
 
+% TODO: Describe the proposed system architecture, components, data flows, and design decisions.
+% Suggested components to cover:
+%   1. Data ingestion layer (Sentinel-1, Sentinel-2 via Copernicus API or Google Earth Engine)
+%   2. Pre-processing pipeline (cloud masking, radiometric calibration, co-registration)
+%   3. Feature extraction and multi-source fusion
+%   4. Multi-label classification model
+%   5. Post-processing / false-alarm filter
+%   6. Alert storage and REST API
+%   7. Institutional consumer interfaces
+% Also describe: cloud infrastructure choices, scalability strategy, data storage approach.
+
+
+% =============================================================
+% PROTOTYPE
+% =============================================================
 \section{Prototype}
+\label{sec:prototype}
 
+% TODO: Describe the proof-of-concept pilot and its scope within the overall architecture.
+% Suggested content:
+%   - Clarify that this is a pilot to validate the central design decision, not a full deployment
+%   - Which component(s) of the architecture the pilot covers
+%   - Proposed technology stack (e.g., Google Earth Engine for data access, Python/PyTorch for modeling,
+%     AWS S3 or GCP Cloud Storage for satellite data, cloud ML endpoints for inference)
+%   - Dataset: study region (e.g., Caquetá/Putumayo), time window, labeling source (IDEAM/UNODC), size
+%   - Model configurations to be compared: independent vs. joint multi-label classifier
+
+
+% =============================================================
+% RESULTS
+% =============================================================
 \section{Results}
+\label{sec:results}
+
 \subsection{Qualitative Results}
+% TODO: Qualitative evaluation of system behavior, alert quality, edge cases observed.
+
 \subsection{Quantitative Results}
+% TODO: Report precision, recall, F1, and false positive rate for each phenomenon,
+% comparing joint vs. independent classifiers. Include a confusion matrix or
+% per-class breakdown.
 
 
-% --- CONCLUSIONS AND FUTURE WORK ---
+% =============================================================
+% CONCLUSIONS AND FUTURE WORK
+% =============================================================
 \section{Conclusions and Future Work}
+\label{sec:conclusions}
+
 \subsection{Contributions}
+% TODO: Summarize what the pilot demonstrated and what design decisions it validated.
+
 \subsection{Final Context}
+% TODO: Situate the results within the broader Colombian and Latin American monitoring
+% landscape. Discuss implications for SMBYC, UNODC/SIMCI, or similar agencies.
+
 \subsection{Future Work}
+% TODO: Outline the path from the proof-of-concept pilot to full-scale deployment.
+% Include: expansion from pilot region to national coverage, integration with
+% institutional APIs (SMBYC, UNODC/SIMCI), real-time ingestion pipeline,
+% explainability requirements for judicial evidence use, governance and data
+% ownership considerations for indigenous territories.
 
 
-\bibliographystyle{plain}
+% =============================================================
+% BIBLIOGRAPHY
+% =============================================================
+\begin{thebibliography}{99}
+
+\bibitem{ideam_smbyc}
+IDEAM. \textit{Alertas Tempranas de Deforestación}. Sistema de Monitoreo de
+Bosques y Carbono (SMByC), 2016.
+\url{http://www.ideam.gov.co/web/ecosistemas/alertas-tempranas-por-deforestacion}
+
+\bibitem{eltiempo_deforestacion2025}
+El Tiempo. \textit{La deforestación en Colombia aumentó 5,2\% en 2025}. 2025.
+\url{https://www.eltiempo.com/vida/medio-ambiente/la-deforestacion-en-colombia-aumento-5-2-en-2025-pero-el-gobierno-celebra-cque-cifras-estan-por-debajo-de-lo-pactado-en-el-plan-de-desarrollo-3575461}
+
+\bibitem{minjusticia_coca2023}
+Ministerio de Justicia y del Derecho. \textit{Resultados del monitoreo a
+cultivos de coca hecho en 2023}. UNODC/SIMCI, 2023.
+\url{https://www.minjusticia.gov.co/Sala-de-prensa/Paginas/Resultados-monitoreo-cultivos-2023-no-son-ajenos-a-presion-global-por-aumento-de-demanda.aspx}
+
+\bibitem{infobae_evoa2023}
+Infobae. \textit{Aumentó la minería ilegal en Colombia: el 73\% de la
+explotación de oro de aluvión es ilícita}. UNODC, 2023.
+\url{https://www.infobae.com/colombia/2023/11/22/aumento-la-mineria-ilegal-en-colombia-el-73-de-la-explotacion-de-oro-de-alivion-es-ilicita/}
+
+\bibitem{gfw_glad}
+Global Forest Watch. \textit{GLAD Deforestation Alerts}. World Resources
+Institute / University of Maryland, 2016.
+\url{https://www.globalforestwatch.org/}
+
+\bibitem{mongabay_siona2023}
+Mongabay Latam. \textit{Deforestación, minería ilegal y narcotráfico acorralan
+a resguardos indígenas de la Amazonía de Colombia}. 2023.
+\url{https://es.mongabay.com/2023/11/deforestacion-mineria-ilegal-narcotrafico-acorralan-resguardos-indigenas-amazonia-colombia/}
+
+\bibitem{mongabay_riopure2026}
+Mongabay Latam. \textit{Minería ilegal en Colombia: deforestación por el oro
+avanza en el Parque Río Puré y pone en riesgo a pueblos indígenas en aislamiento}.
+2026.
+\url{https://es.mongabay.com/2026/07/mineria-ilegal-colombia-deforestacion-oro-rio-pure/}
+
+\bibitem{riocampo2023}
+S.~L. Riocampo, J.~A. Correa García, A.~Gómez Luévano, and G.~S. Bermúdez
+García. \textit{Inteligencia artificial para la detección de la minería ilegal,
+deforestación y cultivos ilícitos por medio de imágenes satelitales}.
+Encuentro Internacional de Educación en Ingeniería, ACOFI, 2023.
+\url{https://acofipapers.org/index.php/eiei/article/view/2973/2315}
+
+\bibitem{comimo_urosario}
+Universidad del Rosario. \textit{CoMiMo: Detección de minería ilegal mediante
+imágenes satelitales}. Based on Saavedra-Romero (2017), 2017.
+\url{https://pure.urosario.edu.co/es/projects/miner\%C3\%ADa-ilegal/}
+
+\bibitem{comimo_infobae2021}
+Infobae. \textit{Desarrollan aplicación para detectar minas ilegales en
+Colombia}. 2021.
+\url{https://www.infobae.com/america/colombia/2021/09/30/desarrollan-aplicacion-para-detectar-minas-ilegales-en-colombia/}
+
+\bibitem{smbyc_atd_github}
+SMByC. \textit{ATD: Alertas Tempranas de Deforestación}. Source code repository,
+IDEAM, 2016.
+\url{https://github.com/SMByC/ATD}
+
+\bibitem{facsat1}
+Fuerza Aérea Colombiana. \textit{FACSAT-1: Detección de patrones de minería
+ilegal a cielo abierto utilizando redes neuronales}. 2023.
+\url{https://poderespacial.fac.mil.co/es/facsat/deteccion-de-patrones-de-mineria-ilegal-cielo-abierto-utilizando-redes-neuronales}
+
+\bibitem{elespectador_deforestacion2025}
+El Espectador. \textit{Deforestación en Colombia alcanzó 72.409 hectáreas en
+2025, 6\% más que en 2024}. 2025.
+\url{https://www.elespectador.com/ambiente/amazonas/deforestacion-en-colombia-alcanzo-72409-hectareas-en-2025-6-mas-que-en-2024/}
+
+\end{thebibliography}
 
 \end{document}
